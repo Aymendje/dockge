@@ -363,7 +363,7 @@ export class Stack {
         });
 
         if (!res.stdout) {
-            return {};
+            return [];
         }
 
         let composeList = JSON.parse(res.stdout.toString());
@@ -381,7 +381,9 @@ export class Stack {
             return CREATED_STACK;
         } else if (composeStack.Status.includes("exited")) {
             // If one of the service is exited, we need to dig deeper
-            let expectedContainersExited = parseInt(composeStatus.Status.split("(")[1].split(")")[0]);
+            // First, we need to get the number of containers that are in the exited state
+            // Then read all the containers and check if they are exited with status 0 (OK) or something else (Not OK)
+            let expectedContainersExited = parseInt(composeStack.Status.split("(")[1].split(")")[0]);
             let containerExitedZero = 0;
             let composeStatus = await this.getSingleComposeStatus(composeStack.Name);
             for (let containerStatus of composeStatus) {
@@ -393,7 +395,7 @@ export class Stack {
                     }
                 }
             }
-            if (containerExitedZero === expectedContainersExited) {
+            if (containerExitedZero == expectedContainersExited) {
                 return RUNNING;
             }
             return EXITED;
