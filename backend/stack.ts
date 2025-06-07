@@ -361,14 +361,14 @@ export class Stack {
      * @param composeName
      * @returns
      */
-    static async getSingleComposeStatus(composeName : string) : Promise<any[]> {
+    static async getSingleComposeStatus(composeName : string) : Promise<any[] | null> {
 
         let res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--filter", `"label=com.docker.compose.project=${composeName}"`, "--format", "json" ], {
             encoding: "utf-8",
         });
 
         if (!res.stdout) {
-            return [];
+            return null;
         }
 
         let composeList = JSON.parse(res.stdout.toString());
@@ -383,6 +383,9 @@ export class Stack {
             let expectedContainersExited = parseInt(composeStack.Status.split("(")[1].split(")")[0]);
             let containerExitedZero = 0;
             let composeStatus = await this.getSingleComposeStatus(composeStack.Name);
+            if (composeStatus === null) {
+                return EXITED;
+            }
             for (let containerStatus of composeStatus) {
                 if (containerStatus.Status.trim().startsWith("exited" ,0)) {
                     if(containerStatus.Status.trim().startsWith("exited (0)" ,0)) {
