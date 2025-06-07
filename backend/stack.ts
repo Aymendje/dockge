@@ -325,7 +325,7 @@ export class Stack {
                 stackList.set(composeStack.Name, stack);
             }
 
-            stack._status = await this.statusConvert(composeStack.Status);
+            stack._status = await this.statusConvert(composeStack);
             stack._configFilePath = composeStack.ConfigFiles;
         }
 
