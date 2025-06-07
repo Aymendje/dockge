@@ -325,7 +325,7 @@ export class Stack {
                 stackList.set(composeStack.Name, stack);
             }
 
-            stack._status = this.statusConvert(composeStack.Status);
+            stack._status = await this.statusConvert(composeStack.Status);
             stack._configFilePath = composeStack.ConfigFiles;
         }
 
@@ -377,27 +377,33 @@ export class Stack {
     }
 
     static async isComposeExitClean(composeStack : any[]) : Promise<number> {
-                    // If one of the service is exited, we need to dig deeper
+            // If one of the service is exited, we need to dig deeper
             // First, we need to get the number of containers that are in the exited state
             // Then read all the containers and check if they are exited with status 0 (OK) or something else (Not OK)
-            let expectedContainersExited = parseInt(composeStack.Status.split("(")[1].split(")")[0]);
-            let containerExitedZero = 0;
-            let composeStatus = await this.getSingleComposeStatus(composeStack.Name);
+            const expectedContainersExited = parseInt(composeStack.Status.split("(")[1].split(")")[0]);
+            let cleanlyExitedContainerCount = 0;
+
+            const composeStatus = await this.getSingleComposeStatus(composeStack.Name);
+
             if (composeStatus === null) {
                 return EXITED;
             }
-            for (let containerStatus of composeStatus) {
-                if (containerStatus.Status.trim().startsWith("exited" ,0)) {
-                    if(containerStatus.Status.trim().startsWith("exited (0)" ,0)) {
-                        containerExitedZero++;
+            for (const containerStatus of composeStatus) {
+                const status = containerStatus.Status.trim();
+
+                if (status.startsWith("exited" ,0)) {
+                    if(status.startsWith("exited (0)" ,0)) {
+                        cleanlyExitedContainerCount++;
                     } else {
                         return EXITED;
                     }
                 }
             }
-            if (containerExitedZero == expectedContainersExited) {
+
+            if (cleanlyExitedContainerCount == expectedContainersExited) {
                 return RUNNING;
             }
+            
             return EXITED;
         }
 
