@@ -356,10 +356,10 @@ export class Stack {
     }
 
     
-    static async getStatusListForCompose(composeName : string) : Promise<Map<string, number>> {
+    static async getSingleComposeStatusList(composeName : string) : Promise<Map<string, number>> {
         let statusList = new Map<string, number>();
 
-        let res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--filter", "\"label=com.docker.compose.project=${composeName}\"", "--format", "json" ], {
+        let res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--filter", `"label=com.docker.compose.project=${composeName}"`, "--format", "json" ], {
             encoding: "utf-8",
         });
 
@@ -382,18 +382,19 @@ export class Stack {
      * @param status
      */
     static statusConvert(composeStack : object) : number {
-        if (composeStack.status.startsWith("created")) {
+        if (composeStack.Status.startsWith("created")) {
             return CREATED_STACK;
-        } else if (composeStack.status.includes("exited")) {
+        } else if (composeStack.Status.includes("exited")) {
             // If one of the service is exited, we need to dig deeper
-            composeContainerList = getStatusListForCompose(composeStack.Name)
-            for (let composeContainer of composeContainerList) {
-                if composeContainer.Status.startsWith("Exited") && !composeContainer.Status.startsWith("Exited (0)") {
+            let composeStatus = await this.getSingleComposeStatusList(composeStack.Name);
+            for (let containerStatus of composeStatus) {
+                if (containerStatus.Status.toLowerCase().trim().startsWith("exited") 
+                    && !containerStatus.Status.toLowerCase().trim().startsWith("exited (0)")) {
                     return EXITED
                 }
             }
             return RUNNING;
-        } else if (composeStack.status.startsWith("running")) {
+        } else if (composeStack.Status.startsWith("running")) {
             // If there is no exited services, there should be only running services
             return RUNNING;
         } else {
