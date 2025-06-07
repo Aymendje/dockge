@@ -97,6 +97,7 @@ export class Stack {
             cwd: this.path,
             encoding: "utf-8",
         });
+        // If the stdout is empty, return an empty object, this should fail the validation since the number of exited containers will be greater than 0
         if (!res.stdout) {
             return {};
         }
@@ -349,13 +350,17 @@ export class Stack {
         let composeList = JSON.parse(res.stdout.toString());
 
         for (let composeStack of composeList) {
-            statusList.set(composeStack.Name, this.statusConvert(composeStack));
+            statusList.set(composeStack.Name, await this.statusConvert(composeStack));
         }
 
         return statusList;
     }
 
-    
+    /**
+     * Get the status of a single compose stack
+     * @param composeName
+     * @returns
+     */
     static async getSingleComposeStatus(composeName : string) : Promise<any[]> {
 
         let res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--filter", `"label=com.docker.compose.project=${composeName}"`, "--format", "json" ], {
@@ -371,16 +376,8 @@ export class Stack {
         return composeList;
     }
 
-    /**
-     * Convert the status string from `docker compose ls` to the status number
-     * Input Example: "exited(1), running(1)"
-     * @param status
-     */
-    static statusConvert(composeStack : any[]) : number {
-        if (composeStack.Status.startsWith("created")) {
-            return CREATED_STACK;
-        } else if (composeStack.Status.includes("exited")) {
-            // If one of the service is exited, we need to dig deeper
+    static async isComposeExitClean(composeStack : any[]) : Promise<number> {
+                    // If one of the service is exited, we need to dig deeper
             // First, we need to get the number of containers that are in the exited state
             // Then read all the containers and check if they are exited with status 0 (OK) or something else (Not OK)
             let expectedContainersExited = parseInt(composeStack.Status.split("(")[1].split(")")[0]);
@@ -399,6 +396,18 @@ export class Stack {
                 return RUNNING;
             }
             return EXITED;
+        }
+
+    /**
+     * Convert the status string from `docker compose ls` to the status number
+     * Input Example: "exited(1), running(1)"
+     * @param status
+     */
+    static async statusConvert(composeStack : any[]) : Promise<number> {
+        if (composeStack.Status.startsWith("created")) {
+            return CREATED_STACK;
+        } else if (composeStack.Status.includes("exited")) {
+            return await this.isComposeExitClean(composeStack);
         } else if (composeStack.Status.startsWith("running")) {
             // If there is no exited services, there should be only running services
             return RUNNING;
