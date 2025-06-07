@@ -356,7 +356,7 @@ export class Stack {
     }
 
     
-    static async getSingleComposeStatus(composeName : string) : Promise<Object> {
+    static async getSingleComposeStatus(composeName : string) : Promise<any[]> {
 
         let res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--filter", `"label=com.docker.compose.project=${composeName}"`, "--format", "json" ], {
             encoding: "utf-8",
@@ -376,7 +376,7 @@ export class Stack {
      * Input Example: "exited(1), running(1)"
      * @param status
      */
-    static statusConvert(composeStack : object) : number {
+    static statusConvert(composeStack : any[]) : number {
         if (composeStack.Status.startsWith("created")) {
             return CREATED_STACK;
         } else if (composeStack.Status.includes("exited")) {
@@ -387,8 +387,8 @@ export class Stack {
             let containerExitedZero = 0;
             let composeStatus = await this.getSingleComposeStatus(composeStack.Name);
             for (let containerStatus of composeStatus) {
-                if (containerStatus.Status.toLowerCase().trim().startsWith("exited"))
-                    if(containerStatus.Status.toLowerCase().trim().startsWith("exited (0)")) {
+                if (containerStatus.Status.trim().startsWith("exited" ,0)) {
+                    if(containerStatus.Status.trim().startsWith("exited (0)" ,0)) {
                         containerExitedZero++;
                     } else {
                         return EXITED;
