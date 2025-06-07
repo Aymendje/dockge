@@ -349,7 +349,28 @@ export class Stack {
         let composeList = JSON.parse(res.stdout.toString());
 
         for (let composeStack of composeList) {
-            statusList.set(composeStack.Name, this.statusConvert(composeStack.Status));
+            statusList.set(composeStack.Name, this.statusConvert(composeStack));
+        }
+
+        return statusList;
+    }
+
+    
+    static async getStatusListForCompose(composeName : string) : Promise<Map<string, number>> {
+        let statusList = new Map<string, number>();
+
+        let res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--filter", "\"label=com.docker.compose.project=${composeName}\"", "--format", "json" ], {
+            encoding: "utf-8",
+        });
+
+        if (!res.stdout) {
+            return statusList;
+        }
+
+        let composeList = JSON.parse(res.stdout.toString());
+
+        for (let composeStack of composeList) {
+            statusList.set(composeStack.Name, this.statusConvert(composeStack));
         }
 
         return statusList;
@@ -360,13 +381,19 @@ export class Stack {
      * Input Example: "exited(1), running(1)"
      * @param status
      */
-    static statusConvert(status : string) : number {
-        if (status.startsWith("created")) {
+    static statusConvert(composeStack : object) : number {
+        if (composeStack.status.startsWith("created")) {
             return CREATED_STACK;
-        } else if (status.includes("exited")) {
-            // If one of the service is exited, we consider the stack is exited
-            return EXITED;
-        } else if (status.startsWith("running")) {
+        } else if (composeStack.status.includes("exited")) {
+            // If one of the service is exited, we need to dig deeper
+            composeContainerList = getStatusListForCompose(composeStack.Name)
+            for (let composeContainer of composeContainerList) {
+                if composeContainer.Status.startsWith("Exited") && !composeContainer.Status.startsWith("Exited (0)") {
+                    return EXITED
+                }
+            }
+            return RUNNING;
+        } else if (composeStack.status.startsWith("running")) {
             // If there is no exited services, there should be only running services
             return RUNNING;
         } else {
