@@ -356,24 +356,19 @@ export class Stack {
     }
 
     
-    static async getSingleComposeStatusList(composeName : string) : Promise<Map<string, number>> {
-        let statusList = new Map<string, number>();
+    static async getSingleComposeStatus(composeName : string) : Promise<Object> {
 
         let res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--filter", `"label=com.docker.compose.project=${composeName}"`, "--format", "json" ], {
             encoding: "utf-8",
         });
 
         if (!res.stdout) {
-            return statusList;
+            return {};
         }
 
         let composeList = JSON.parse(res.stdout.toString());
 
-        for (let composeStack of composeList) {
-            statusList.set(composeStack.Name, this.statusConvert(composeStack));
-        }
-
-        return statusList;
+        return composeList;
     }
 
     /**
@@ -386,14 +381,22 @@ export class Stack {
             return CREATED_STACK;
         } else if (composeStack.Status.includes("exited")) {
             // If one of the service is exited, we need to dig deeper
-            let composeStatus = await this.getSingleComposeStatusList(composeStack.Name);
+            let expectedContainersExited = parseInt(composeStatus.Status.split("(")[1].split(")")[0]);
+            let containerExitedZero = 0;
+            let composeStatus = await this.getSingleComposeStatus(composeStack.Name);
             for (let containerStatus of composeStatus) {
-                if (containerStatus.Status.toLowerCase().trim().startsWith("exited") 
-                    && !containerStatus.Status.toLowerCase().trim().startsWith("exited (0)")) {
-                    return EXITED
+                if (containerStatus.Status.toLowerCase().trim().startsWith("exited"))
+                    if(containerStatus.Status.toLowerCase().trim().startsWith("exited (0)")) {
+                        containerExitedZero++;
+                    } else {
+                        return EXITED;
+                    }
                 }
             }
-            return RUNNING;
+            if (containerExitedZero === expectedContainersExited) {
+                return RUNNING;
+            }
+            return EXITED;
         } else if (composeStack.Status.startsWith("running")) {
             // If there is no exited services, there should be only running services
             return RUNNING;
